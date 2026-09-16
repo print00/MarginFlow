@@ -1,0 +1,5 @@
+import { PrismaClient, TransactionType } from "@prisma/client";
+import { hash } from "bcryptjs";
+const db=new PrismaClient();
+async function main(){await db.user.deleteMany({where:{email:"alex@gardentable.demo"}});const user=await db.user.create({data:{name:"Alex Morgan",email:"alex@gardentable.demo",passwordHash:await hash("demo1234",12)}});const restaurant=await db.restaurant.create({data:{name:"The Garden Table",ownerId:user.id,members:{create:{userId:user.id,role:"OWNER"}}}});await db.monthlyTarget.create({data:{restaurantId:restaurant.id,month:6,year:2026,targetSales:70000,targetProfit:12000}});for(const [date,description,amount,type,category] of [["2026-06-02","TOAST PAYOUT",12840,"INCOME","Restaurant Sales"],["2026-06-04","DOORDASH PAYOUT",3260,"INCOME","Delivery App Income"],["2026-06-05","RESTAURANT DEPOT",4120,"EXPENSE","Grocery / Food Supplies"],["2026-06-11","JUNE RENT",6200,"EXPENSE","Rent"]] as const){await db.transaction.create({data:{restaurantId:restaurant.id,date:new Date(date),description,amount,transactionType:type as TransactionType,category,confidenceScore:95,needsReview:false}})}}
+main().finally(()=>db.$disconnect());

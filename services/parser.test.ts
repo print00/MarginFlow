@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { money, parseCsv } from "./parser";
+describe("statement parser",()=>{it("cleans money values",()=>{expect(money("$1,234.50")).toBe(1234.5);expect(money("(25.00)")).toBe(-25)});it("parses debit and credit columns",()=>{const rows=parseCsv("Posted Date,Description,Debit,Credit\n06/01/2026,SYSCO,$100.00,\n06/02/2026,TOAST,,$500.00");expect(rows).toHaveLength(2);expect(rows[0]).toMatchObject({type:"expense",amount:100,category:"Grocery / Food Supplies"});expect(rows[1]).toMatchObject({type:"income",amount:500,category:"Restaurant Sales"})})});

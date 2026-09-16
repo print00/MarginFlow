@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+enum UploadStatus {
+  UPLOADED
+  PARSED
+  REVIEWED
+  COMPLETED
+}
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+enum TransactionSource {
+  STATEMENT_UPLOAD
+  MANUAL
+}
+
+model User {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  restaurants  Restaurant[] @relation("RestaurantOwner")
+  memberships  Membership[]
+  auditLogs    AuditLog[]
+}
+
+model Restaurant {
+  id              String            @id @default(cuid())
+  name            String
+  ownerId         String
+  owner           User              @relation("RestaurantOwner", fields: [ownerId], references: [id])
+  createdAt       DateTime          @default(now())
+  members         Membership[]
+  statementUploads StatementUpload[]
+  transactions    Transaction[]
+  manualEntries   ManualEntry[]
+  payrollEntries  PayrollEntry[]
+  monthlyTargets  MonthlyTarget[]
+  categoryRules   CategoryRule[]
+  auditLogs       AuditLog[]
+  @@index([ownerId])
+}
+
+model Membership {
+  id           String       @id @default(cuid())
+  userId       String
+  restaurantId String
+  role         MemberRole   @default(MEMBER)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  @@unique([userId, restaurantId])
+  @@index([restaurantId])
+}
+
+model StatementUpload {
+  id           String       @id @default(cuid())
+  restaurantId String
+  fileName     String
+  fileType     String
+  month        Int
+  year         Int
+  status       UploadStatus @default(UPLOADED)
+  createdAt    DateTime     @default(now())
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  @@index([restaurantId, year, month])
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  restaurantId      String
+  statementUploadId String?
+  date              DateTime
+  description       String
+  merchantName      String?
+  normalizedMerchant String?
+  amount            Decimal           @db.Decimal(12, 2)
+  transactionType   TransactionType
+  category          String
+  confidenceScore   Int               @default(50)
+  source            TransactionSource @default(STATEMENT_UPLOAD)
+  needsReview       Boolean           @default(true)
+  notes             String?
+  createdAt         DateTime          @default(now())
+  restaurant        Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  statementUpload   StatementUpload?  @relation(fields: [statementUploadId], references: [id], onDelete: SetNull)
+  @@index([restaurantId, date])
+  @@index([statementUploadId])
+}
+
+model ManualEntry {
+  id           String          @id @default(cuid())
+  restaurantId String
+  date         DateTime
+  title        String
+  amount       Decimal         @db.Decimal(12, 2)
+  type         TransactionType
+  category     String
+  notes        String?
+  createdAt    DateTime        @default(now())
+  restaurant   Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  @@index([restaurantId, date])
+}
+
+model PayrollEntry {
+  id              String     @id @default(cuid())
+  restaurantId    String
+  weekStartDate   DateTime
+  weekEndDate     DateTime
+  kitchenLabor    Decimal    @db.Decimal(12, 2)
+  serverLabor     Decimal    @db.Decimal(12, 2)
+  managerLabor    Decimal    @db.Decimal(12, 2)
+  otherLabor      Decimal    @db.Decimal(12, 2)
+  totalLabor      Decimal    @db.Decimal(12, 2)
+  notes           String?
+  createdAt       DateTime   @default(now())
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  @@index([restaurantId, weekStartDate])
+}
+
+model MonthlyTarget {
+  id           String     @id @default(cuid())
+  restaurantId String
+  month        Int
+  year         Int
+  targetSales  Decimal    @db.Decimal(12, 2)
+  targetProfit Decimal    @db.Decimal(12, 2)
+  createdAt    DateTime   @default(now())
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  @@unique([restaurantId, month, year])
+}
+
+model CategoryRule {
+  id                 String          @id @default(cuid())
+  restaurantId       String
+  keyword            String
+  normalizedMerchant String?
+  category           String
+  transactionType    TransactionType
+  createdAt          DateTime        @default(now())
+  restaurant         Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  @@index([restaurantId])
+}
+
+model AuditLog {
+  id           String     @id @default(cuid())
+  restaurantId String
+  userId       String
+  action       String
+  details      Json
+  createdAt    DateTime   @default(now())
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@index([restaurantId, createdAt])
+}
